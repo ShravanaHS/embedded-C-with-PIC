@@ -2,7 +2,7 @@
 
 ## Introduction
 Hi! This repository contains a variety of **hardware interface codes for the PIC16F877A microcontroller**. All code is written in embedded C and does not rely on any external libraries—everything is **implemented from scratch**.
-Development is done using **[MPLAB X IDE](https://www.microchip.com/en-us/tools-resources/develop/mplab-x-ide)** for code writing and compilation, and **[SimulIDE](https://simulide.com/p/)** for functional simulation and hardware verification.
+Development is done using **[MPLAB X IDE](https://www.microchip.com/en-us/tools-resources/develop/mplab-x-ide)** for code writing and compilation (generation of **.hex** file), and **[SimulIDE](https://simulide.com/p/)** for functional simulation and hardware verification.
 Both **tools are free, open source**, and easy to use on most platforms.
 
 ## Project 1: Blinking LED
@@ -11,12 +11,12 @@ Both **tools are free, open source**, and easy to use on most platforms.
 This is a simple project to blink an LED connected to the PIC16F877A microcontroller. The LED blinks with a delay of 500ms ON and 500ms OFF indefinitely, demonstrating basic digital output control.
 
 ### Hardware Connections
-- **LED** connected to **PORTC pin RC0**
+- **LED** connected to **PORTB pin RB1**
 - The pin is configured as output in the firmware.
 - No additional components required apart from an LED and a current limiting resistor.
 
 ### Code Overview
-- The code initializes PORTC, pin RC0 as an output.
+- The code initializes PORTB, pin RB1 as an output.
 - In the main loop, the LED is turned ON, a delay is applied, then the LED is turned OFF, followed by another delay.
 - The delay and LED toggling repeats infinitely.
 
@@ -27,11 +27,11 @@ This is a simple project to blink an LED connected to the PIC16F877A microcontro
 #define _XTAL_FREQ 20000000 // 20MHz oscillator frequency
 
 void main(void) {
-TRISCbits.TRISC0 = 0; // Configure RC0 as output
+TRISCbits.TRISB1 = 0; // Configure RC0 as output
 while(1) {
-PORTCbits.RC0 = 1; // LED ON
+PORTCbits.RB1 = 1; // LED ON
 __delay_ms(500);
-PORTCbits.RC0 = 0; // LED OFF
+PORTCbits.RB1 = 0; // LED OFF
 __delay_ms(500);
 }
 }
@@ -104,10 +104,9 @@ PORTCbits.RC0 = 0;
 ```
 
 ### Simulation Result
-![Push Button Simulation](Push_Button_Interface/simulation.gif)
+![Project Simulation](embedded-C-with-PIC/blob/main/screenshoots/Screenshot%202025-08-01%20162215.png)
 
-### Download  
-[Download Push Button Interface project ZIP](Push_Button_Interface/Push_Button_Interface.zip)
+
 
 
 ## Project 3: 7-Segment Display Interface
@@ -184,10 +183,9 @@ for(unsigned long j = 50000; j--; ); // Delay loop
 
 ```
 ### Simulation Result
-![7-Segment Simulation](SevenSegment/simulation.gif)
+![Project Simulation](screenshoots/project3.png)
 
-### Download  
-[Download 7-Segment Display project ZIP](SevenSegment/SevenSegment.zip)
+
 
 
 ## Project 4: LCD Display Interface in 8-bit and 4-bit Modes
@@ -362,7 +360,7 @@ EN = 1; delay; EN = 0;
 
 ### Simulation Result
 
-![LCD Simulation](LCD/simulation.gif)
+![Project Simulation](screenshoots/project4.png)
 
 ---
 
