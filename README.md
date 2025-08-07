@@ -104,7 +104,7 @@ PORTCbits.RC0 = 0;
 ```
 
 ### Simulation Result
-![Project Simulation](embedded-C-with-PIC/blob/main/screenshoots/Screenshot%202025-08-01%20162215.png)
+![Project Simulation](screenshoots/project2.png)
 
 
 
@@ -364,11 +364,264 @@ EN = 1; delay; EN = 0;
 
 ---
 
-### Download
+## Project 5: Keypad Interfacing with PIC16F877A
 
-[Download LCD Interface project ZIP](LCD/LCD.zip)
+### Description
+This project demonstrates interfacing a 4x3 matrix keypad with the PIC16F877A microcontroller and displaying the pressed key on a 16x2 LCD. The keypad scanning is done using the row-column method, where the columns are driven as outputs and rows as inputs. By sequentially activating one column at a time and reading the rows, the pressed key can be identified.
 
 ---
+
+### Hardware Connections
+
+| Keypad Pin | PIC Pin (PORTB) | Direction      | Function          |
+|------------|-----------------|----------------|-------------------|
+| Column 1   | RB3 (C1)        | Output         | Drive column 1    |
+| Column 2   | RB2 (C2)        | Output         | Drive column 2    |
+| Column 3   | RB1 (C3)        | Output         | Drive column 3    |
+| Row 1      | RB7 (B1)        | Input (with pull-up) | Read row 1    |
+| Row 2      | RB6 (B2)        | Input (with pull-up) | Read row 2    |
+| Row 3      | RB5 (B3)        | Input (with pull-up) | Read row 3    |
+| Row 4      | RB4 (B4)        | Input (with pull-up) | Read row 4    |
+
+**LCD** data connected to **PORTC** and control pins to **PORTD** (RD0-RD2) as per your code.
+
+---
+
+### Theory: How Row-Column Scanning Works
+
+A matrix keypad internally connects buttons in rows and columns. Pressing a specific button bridges one row and one column.
+
+Since each button closes contact between one row and one column, the MCU can determine **which button** is pressed by:
+
+1. Sequentially driving **one column output low** at a time (others high).
+2. Reading all the row inputs.
+3. If any row reads low (0), it implies that particular row's button in the current column is pressed.
+4. By repeating this for each column and reading rows, the exact key can be decoded.
+
+**Why do we do this?**  
+Instead of dedicating one I/O pin per button (which would be 12 pins for 12 keys), matrix scanning lets you scan all keys with fewer pins (7 pins in your case: 3 columns output + 4 rows input).
+
+---
+
+### Important Notes on Implementation
+
+- **Pull-up resistors:** Rows are inputs and need to have stable logic when keys are not pressed. Internal pull-ups are enabled via `OPTION_REGbits.nRBPU = 0;` or external pull-ups used.
+- **Logic levels:**  
+  - Columns are driven LOW one-by-one.
+  - When a key is pressed, the corresponding row input is pulled LOW.
+- **Debouncing:** Your code uses `while(Bx == 1);` which waits for a key release, providing simple debouncing.
+- **LCD display:** The detected key is immediately displayed on the LCD by sending the ASCII character corresponding to the key.
+
+---
+
+### Code Explanation 
+```
+#pragma config FOSC = EXTRC       // Oscillator Selection bits (RC oscillator)
+#pragma config WDTE = ON          // Watchdog Timer Enable bit (WDT enabled)
+#pragma config PWRTE = OFF        // Power-up Timer Enable bit (PWRT disabled)
+#pragma config BOREN = ON         // Brown-out Reset Enable bit (BOR enabled)
+#pragma config LVP = ON           // Low-Voltage Programming enabled
+#pragma config CPD = OFF          // Data EEPROM Memory Code Protection off
+#pragma config WRT = OFF          // Flash Program Memory Write Enable off
+#pragma config CP = OFF           // Flash Program Memory Code Protection off
+
+#include <xc.h>
+
+#define _XTAL_FREQ 20000000
+
+// LCD Control Pin Definitions
+#define RS PORTDbits.RD2
+#define RW PORTDbits.RD1
+#define EN PORTDbits.RD0
+
+// Keypad Column Pins (outputs)
+#define C1 PORTBbits.RB3
+#define C2 PORTBbits.RB2
+#define C3 PORTBbits.RB1
+
+// Keypad Row Pins (inputs)
+#define R1 PORTBbits.RB7
+#define R2 PORTBbits.RB6
+#define R3 PORTBbits.RB5
+#define R4 PORTBbits.RB4
+
+// LCD Functions
+void lcd_command(unsigned char cmd){
+    PORTC = cmd;
+    RS = 0; RW = 0; EN = 1;
+    __delay_ms(5);
+    EN = 0;
+}
+
+void lcd_data(unsigned char data){
+    PORTC = data;
+    RS = 1; RW = 0; EN = 1;
+    __delay_ms(5);
+    EN = 0;
+}
+
+void lcd_string(const unsigned char* str, unsigned char len){
+    for(unsigned char i = 0; i < len; i++){
+        lcd_data(str[i]);
+    }
+}
+
+void lcd_init(void){
+    TRISC = 0x00;  // LCD Data port output
+    TRISD = 0x00;  // LCD control pins output
+    lcd_command(0x38); // 8-bit, 2 lines, 5x8 font
+    lcd_command(0x06); // Cursor Auto Increment
+    lcd_command(0x0C); // Display ON Cursor OFF
+    lcd_command(0x01); // Clear display
+    __delay_ms(2);
+}
+
+// Keypad scan function
+void keypad_scan(void){
+    // Set all columns high initially (disabled)
+    C1 = 1; C2 = 1; C3 = 1;
+
+    // Scan Column 1 (C1 low)
+    C1 = 0; C2 = 1; C3 = 1;
+    if(R1 == 0){ lcd_data('1'); while(R1 == 0); }
+    else if(R2 == 0){ lcd_data('4'); while(R2 == 0); }
+    else if(R3 == 0){ lcd_data('7'); while(R3 == 0); }
+    else if(R4 == 0){ lcd_data('*'); while(R4 == 0); }
+
+    // Scan Column 2 (C2 low)
+    C1 = 1; C2 = 0; C3 = 1;
+    if(R1 == 0){ lcd_data('2'); while(R1 == 0); }
+    else if(R2 == 0){ lcd_data('5'); while(R2 == 0); }
+    else if(R3 == 0){ lcd_data('8'); while(R3 == 0); }
+    else if(R4 == 0){ lcd_data('0'); while(R4 == 0); }
+
+    // Scan Column 3 (C3 low)
+    C1 = 1; C2 = 1; C3 = 0;
+    if(R1 == 0){ lcd_data('3'); while(R1 == 0); }
+    else if(R2 == 0){ lcd_data('6'); while(R2 == 0); }
+    else if(R3 == 0){ lcd_data('9'); while(R3 == 0); }
+    else if(R4 == 0){ lcd_data('#'); while(R4 == 0); }
+
+    // Reset columns high (inactive)
+    C1 = 1; C2 = 1; C3 = 1;
+}
+
+void main(void){
+    // Initialize ports:
+    TRISC = 0x00;       // PORTC as output for LCD data
+    TRISD = 0x00;       // PORTD as output for LCD control
+    TRISB = 0xF0;       // RB7-RB4 inputs (rows), RB3-RB1 outputs (columns)
+    OPTION_REGbits.nRBPU = 0;  // Enable PORTB pull-ups
+
+    lcd_init();
+
+    lcd_command(0x83);  // Set cursor position (row 1, col 3)
+    lcd_string((const unsigned char *)"keypad", 6);
+    lcd_command(0xC3);  // Set cursor position (row 2, col 3)
+    
+    while(1){
+        keypad_scan();   // Scan keypad and print pressed key on LCD
+    }
+}
+
+
+```
+
+- Here, only one column pin is driven LOW at a time; the others are kept HIGH.
+- Rows are read to detect pressed keystroke.
+- Upon detecting a pressed key (row reads LOW), the corresponding character is sent to `lcddata()` to display on LCD.
+- The `while(Bx == 0);` loops wait for the button release, preventing multiple detections (simple debounce).
+
+---
+
+
+
+---
+
+### Summary
+
+- Keypad interfacing saves pins by using matrix scanning, controlling columns and reading rows.
+- Drive columns LOW one by one and read the rows to detect key presses.
+- Use internal or external pull-ups for stable input.
+- Display the detected key immediately on LCD.
+- Use simple debounce via waiting for button release.
+
+---
+
+### Simulation Result
+
+![Keypad Simulation](screenshoots/project5.png)  
+
+
+---
+
+
+## Project 6: Relay Integration with PIC16F877A
+
+### Description
+This project demonstrates how to control a relay using the PIC16F877A microcontroller. Relays allow you to switch high-voltage or high-current devices (like lamps or motors) using the low-power I/O of the PIC. In this example, the relay is toggled on and off at 0.5 second intervals, which can be used to switch any device connected to the relay’s NO (Normally Open) contacts.
+
+---
+
+### Theory and Circuit Explanation
+
+**Relay Basics:**
+- A relay is an electromechanical switch. It uses a small current to energize a coil, which closes a set of contacts to switch a larger load (AC or DC).
+- Microcontrollers like the PIC cannot drive a relay coil directly due to current limitations.
+- Typically, an NPN transistor (such as a BC547) is used as a driver. The PIC output pin controls the base of the transistor through a resistor. When the pin is high, the transistor conducts and energizes the relay coil.
+- A flyback diode is placed across the relay coil to protect the transistor from voltage spikes when the relay switches off.
+
+**Refer to the schematic:**
+- The circuit in your image shows a relay driver using a transistor, a relay coil, and a flyback diode.
+- The relay switches a 220V AC lamp, which is isolated from the PIC by the relay's contacts.
+- The relay coil is powered by 12V DC, and the control line comes from one of the microcontroller's output pins (RB1 in this example).
+
+---
+
+### Hardware Connections (from schematic and code)
+
+| Signal    | PIC Pin      | External Circuit                |
+|-----------|--------------|---------------------------------|
+| Relay IN  | RB1 (PORTB1) | Transistor base (via resistor)  |
+| 12VDC     | Relay coil   | Relay V+                        |
+| GND       | PIC + Relay  | Common ground for both circuits |
+| Lamp AC   | Relay NO/COM | Controlled by relay contacts    |
+
+---
+
+### Source Code: Relay Blinking with PIC
+```
+#include <xc.h>
+
+#define _XTAL_FREQ 20000000 // 20MHz oscillator frequency
+
+void main(void) {
+TRISBbits.TRISB1 = 0; // Configure RB1 as output (relay control)
+while(1) {
+PORTBbits.RB1 = 1; // Relay ON (transistor conducts, coil energized)
+__delay_ms(500); // Wait 500ms
+PORTBbits.RB1 = 0; // Relay OFF
+__delay_ms(500); // Wait 500ms
+}
+}
+
+```
+
+---
+
+### Working
+- When RB1 is set HIGH, the transistor switches on, energizing the relay coil and closing the relay contacts. This switches ON the connected load (e.g., a lamp).
+- When RB1 is set LOW, the transistor turns off, the relay coil is de-energized, and the lamp turns OFF.
+- This cycle repeats, so the relay (and load) toggles every 0.5 seconds.
+
+---
+
+### Simulation Result
+
+![Relay Blinking Simulation](screenshoots/project6.png)
+
+---
+
 
 
 
