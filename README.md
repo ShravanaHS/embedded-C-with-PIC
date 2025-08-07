@@ -38,7 +38,7 @@ __delay_ms(500);
 ```
 
 ### Simulation Result
-![Blinking LED Simulation](Blinking_LED/simulation.gif)
+![Project Simulation](screenshoots/project1.gif)
 
 ### Download  
 [Download Blinking LED project ZIP](Blinking_LED/Blinking_LED.zip)
