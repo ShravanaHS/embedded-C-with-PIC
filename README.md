@@ -190,141 +190,187 @@ for(unsigned long j = 50000; j--; ); // Delay loop
 [Download 7-Segment Display project ZIP](SevenSegment/SevenSegment.zip)
 
 
-## Project 4: LCD Display Interface
+## Project 4: LCD Display Interface in 8-bit and 4-bit Modes
 
 ### Description
-This project demonstrates interfacing a 16x2 character LCD (HD44780 compatible) with the PIC16F877A microcontroller in 8-bit mode. The LCD is used to display strings and characters by sending commands and data directly through PORTC and control pins on PORTD. This project covers basic LCD initialization, command writing, data writing, and simple string display.
+
+This project demonstrates interfacing a 16x2 character LCD (HD44780 compatible) with the PIC16F877A microcontroller. The code provides both theory and a full working example for **8-bit mode** and explains **4-bit mode**, including how to send data using only four data lines.
 
 ---
 
-### Theory
+### LCD Theory: 8-bit vs 4-bit Mode
 
-**LCD Display:**  
-A 16x2 LCD has 16 columns and 2 rows, with each character cell consisting of a 5x8 dot matrix display. Characters are displayed by turning on the LEDs (dots) in the matrix pattern.
+#### **How the LCD Works**
+- A 16x2 LCD has 16 columns and 2 rows. Each character cell is a 5x8 dot matrix display, where characters appear by lighting selected LEDs (dots).
+- Most displays use an HD44780 controller, which provides two main registers:
+  - **Instruction Register (IR):** Receives commands (move cursor, clear display, etc.)
+  - **Data Register (DR):** Receives the actual characters to display.
+- Each character position on the LCD maps to a specific address in Display Data RAM (DDRAM):
+  - **Row 1:** Addresses 0x80–0x8F
+  - **Row 2:** Addresses 0xC0–0xCF
 
-Controlling individual LEDs directly is complex, so LCD modules like the HD44780 use an internal controller that handles dot activation. The controller exposes two main registers:  
-- **Instruction Register (IR)**: Receives commands controlling the LCD (e.g., clear screen, cursor movement)  
-- **Data Register (DR)**: Receives data corresponding to characters to display
-
-Each character on the 16x2 LCD corresponds to a unique **address** in the controller's DDRAM (Display Data RAM):  
-- First row addresses range from `0x80` to `0x8F`  
-- Second row addresses range from `0xC0` to `0xCF`
-
-To display a character, you send the address to indicate location and then the character data.
-
----
-
-### LCD Pin Functionality
-
-| LCD Pin | Function                         |
-|---------|---------------------------------|
-| RS      | Register Select (0 = command, 1 = data)  |
-| RW      | Read/Write (0 = write, 1 = read)         |
-| EN      | Enable (latch signal)                    |
-| D0-D7   | Data pins (8-bit mode)                    |
-
-- When **RS = 0**, data sent is stored in the instruction register (commands).  
-- When **RS = 1**, data sent is stored in the data register (characters).  
+#### **Pins**
+- **RS:** Register Select (0 = command, 1 = data)
+- **RW:** Read/Write (0 = write, 1 = read, usually kept at 0)
+- **EN:** Enable (triggered High-Low pulse to latch data/command)
+- **D0-D7:** Data pins (8 for 8-bit mode, D4-D7 only for 4-bit mode)
 
 ---
 
 ### 8-bit vs 4-bit Mode
 
-- **8-bit mode:** Connect a full 8-bit port (e.g., PORTC) for data pins D0-D7 to LCD. Faster but uses more I/O pins.
-- **4-bit mode:** Use only 4 data lines, sending commands in two nibbles, saving pin count at the cost of complexity.
+- **8-bit mode:** Uses eight data lines (D0-D7) for sending commands/data. Faster and easier to implement, but uses many I/O pins.
+- **4-bit mode:** Uses only four data lines (D4–D7). You send each byte as two "nibbles":
+  - First the higher nibble (MSB, bits 7–4)
+  - Then the lower nibble (LSB, bits 3–0), shifted to the high bits.
+  - Saves pins at the cost of code complexity and speed.
+
+**Typical sequence for 4-bit mode:**  
+For `data` (8 bits):
+1. Send `(data & 0xF0)` (upper 4 bits, aligned to D7-D4)
+2. Pulse EN
+3. Send `((data << 4) & 0xF0)` (lower 4 bits, aligned to D7-D4)
+4. Pulse EN
 
 ---
 
-### Key LCD Commands Used
-
-| Command       | Function                             |
-|---------------|------------------------------------|
-| `0x38`        | Function set: 8-bit, 2 lines, 5x8 font |
-| `0x06`        | Entry mode set: cursor auto-increment |
-| `0x0C`        | Display on, cursor off              |
-| `0x01`        | Clear display                      |
+### Hardware Connections (For 8-bit Mode Example Code Below)
+- **LCD D0–D7** → **PORTB RB0–RB7**
+- **RS** → **RD5**
+- **RW** → **RD6**
+- **EN** → **RD7**
+- **Vss, Vdd, V0, Backlight**: Standard LCD power connections (see LCD datasheet)
 
 ---
 
-### Working Flow
-
-- Configure ports connected to LCD data and control lines as outputs.
-- Send the above commands in sequence to initialize the LCD.
-- Display characters by writing data to the LCD’s data register.
-- Use delays to allow the LCD time to process commands.
-
----
-### Source code snpiiet
+### Example: 8-bit Mode Code
 ```
+#pragma config FOSC = EXTRC
+#pragma config WDTE = ON
+#pragma config PWRTE = OFF
+#pragma config BOREN = ON
+#pragma config LVP = ON
+#pragma config CPD = OFF
+#pragma config WRT = OFF
+#pragma config CP = OFF
+
 #include <xc.h>
-#include "lcd.h"
-
-#define RS PORTDbits.RD2
-#define RW PORTDbits.RD1
-#define EN PORTDbits.RD0
-
-void lcd_init(void) {
-TRISC = 0x00; // Configure PORTC as output (data)
-TRISD = 0x00; // Configure PORTD as output (control pins)
-
-text
-lcd_command(0x38); // 8-bit, 2 line, 5x8 font
-lcd_command(0x0C); // Display ON, Cursor OFF
-lcd_command(0x06); // Auto-increment cursor
-lcd_command(0x01); // Clear display
-__delay_ms(2);     // Clearing takes >1.5ms
-}
-
-void lcd_command(unsigned char cmd) {
-PORTC = cmd;
-RS = 0; // Command mode
-RW = 0; // Write mode
-EN = 1; // Latch data
-__delay_ms(2);
-EN = 0;
-}
-
-void lcd_data(unsigned char data) {
-PORTC = data;
-RS = 1; // Data mode
-RW = 0; // Write mode
-EN = 1; // Latch data
-__delay_ms(2);
-EN = 0;
-}
-
-void lcd_puts(const char *str) {
-while(*str) {
-lcd_data(*str++);
-}
-}
-
-void lcd_clear(void) {
-lcd_command(0x01);
-__delay_ms(2);
-}
-```
-
-### Sample main.c usage snippet
-```
-#include <xc.h>
-#include "lcd.h"
 
 #define _XTAL_FREQ 20000000
 
-void main(void) {
-lcd_init();
-lcd_clear();
-lcd_puts("Hello, PIC!");
-while(1);
+#define RS PORTDbits.RD5
+#define RW PORTDbits.RD6
+#define EN PORTDbits.RD7
+
+void lcddata(unsigned char data) {
+PORTB = data;
+RS = 1;
+RW = 0;
+EN = 1;
+__delay_ms(5);
+EN = 0;
 }
+
+void lcd_command(unsigned char cmd) {
+PORTB = cmd;
+RS = 0;
+RW = 0;
+EN = 1;
+__delay_ms(5);
+EN = 0;
+}
+
+void lcd_string(const unsigned char *str, unsigned char num) {
+for(unsigned char i = 0; i < num; i++) {
+lcddata(str[i]);
+}
+}
+
+void lcdinit() {
+lcd_command(0x38); // 8-bit, 2 lines, 5x8 matrix
+lcd_command(0x06); // Increment cursor
+lcd_command(0x0C); // Display ON, cursor OFF
+lcd_command(0x01); // Clear display
+}
+
+static void init_config(void) {
+TRISB = 0x00; // PORTB as output (data pins)
+PORTB = 0x00;
+TRISD = 0x00; // PORTD as output (control pins)
+PORTD = 0x00;
+}
+
+void main(void) {
+init_config();
+lcdinit();
+while(1) {
+__delay_ms(1000);
+lcd_command(0x83); // Go to col 3 of row 1
+lcd_string("Shravana", 8);
+lcd_command(0xC3); // Go to col 3 of row 2
+lcd_string("SHS", 3);
+__delay_ms(1000);
+lcd_command(0x01); // Clear screen
+    lcd_command(0x83);
+    lcd_string("engineering", 11);
+    lcd_command(0xC3);
+    lcd_string("HII", 3);
+    __delay_ms(1000);
+    lcd_command(0x01);
+}
+}
+
 ```
+---
+
+### 4-bit Mode Theory and Pseudocode
+
+**4-bit mode saves pins:**  
+- Only D4–D7 pins (often connected to RB4–RB7 or RC4–RC7) are used.
+- Each byte is split into two nibbles and sent in sequence: first upper, then lower.
+
+**Pseudocode for sending in 4-bit mode:**
+// Send upper nibble
+PORTX = (data & 0xF0); // Mask and send upper nibble (D7–D4)
+RS = x; RW = 0;
+EN = 1; delay; EN = 0;
+
+// Send lower nibble, shifted to D7–D4
+PORTX = ((data << 4) & 0xF0); // Shift lower nibble to upper bits
+RS = x; RW = 0;
+EN = 1; delay; EN = 0;
+
+
+- `RS = 1` for data; `RS = 0` for command.
+
+**You must initialize the LCD in 4-bit mode with a specific command sequence** (see HD44780 datasheet for details).
+
+---
+
+### LCD Commands Reference
+
+| Command        | Function                     |
+|----------------|-----------------------------|
+| `0x38`         | 16x2, 8-bit mode            |
+| `0x06`         | Cursor auto-increment       |
+| `0x0C`         | Display ON, cursor OFF      |
+| `0x01`         | Clear display               |
+| `0x80–0x8F`    | DDRAM addresses (row 1)     |
+| `0xC0–0xCF`    | DDRAM addresses (row 2)     |
+
+---
+
 ### Simulation Result
+
 ![LCD Simulation](LCD/simulation.gif)
 
-### Download  
-[Download LCD Interface project ZIP](LCD/LCD.zi
+---
 
+### Download
+
+[Download LCD Interface project ZIP](LCD/LCD.zip)
+
+---
 
 
 
