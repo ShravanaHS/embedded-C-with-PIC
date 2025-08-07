@@ -195,31 +195,65 @@ for(unsigned long j = 50000; j--; ); // Delay loop
 ### Description
 This project demonstrates interfacing a 16x2 character LCD (HD44780 compatible) with the PIC16F877A microcontroller in 8-bit mode. The LCD is used to display strings and characters by sending commands and data directly through PORTC and control pins on PORTD. This project covers basic LCD initialization, command writing, data writing, and simple string display.
 
-### Hardware Connections
-- **Data pins (D0 to D7)** of the LCD connected to **PORTC (RC0 to RC7)**
-- **Control pins:**
-  - RS (Register Select) connected to **RD2**
-  - RW (Read/Write) connected to **RD1**
-  - EN (Enable) connected to **RD0**
-- **Power supply:** Vdd and Vss pins connected properly
-- **Contrast (V0):** Connected to a potentiometer or fixed voltage to adjust display contrast
-- **Backlight:** Connected as per LCD module specifications (optional)
+---
 
-### Theory of Operation
-- The LCD requires an initialization sequence to function properly in 8-bit mode.
-- Commands are sent to control LCD functions like clear display, cursor movement, and display on/off.
-- Data is sent to display characters.
-- RS pin selects command or data register.
-- RW pin selects read or write operation (usually kept low for writing).
-- EN pin is toggled to latch data/command into LCD.
-- Delays are essential between commands/data to allow LCD internal processing.
+### Theory
 
-### LCD Command Reference (Examples)
-- `0x38`: Function set (8-bit mode, 2 lines, 5x8 dots)
-- `0x0C`: Display ON, cursor OFF
-- `0x06`: Entry mode set (cursor increment)
-- `0x01`: Clear display
+**LCD Display:**  
+A 16x2 LCD has 16 columns and 2 rows, with each character cell consisting of a 5x8 dot matrix display. Characters are displayed by turning on the LEDs (dots) in the matrix pattern.
 
+Controlling individual LEDs directly is complex, so LCD modules like the HD44780 use an internal controller that handles dot activation. The controller exposes two main registers:  
+- **Instruction Register (IR)**: Receives commands controlling the LCD (e.g., clear screen, cursor movement)  
+- **Data Register (DR)**: Receives data corresponding to characters to display
+
+Each character on the 16x2 LCD corresponds to a unique **address** in the controller's DDRAM (Display Data RAM):  
+- First row addresses range from `0x80` to `0x8F`  
+- Second row addresses range from `0xC0` to `0xCF`
+
+To display a character, you send the address to indicate location and then the character data.
+
+---
+
+### LCD Pin Functionality
+
+| LCD Pin | Function                         |
+|---------|---------------------------------|
+| RS      | Register Select (0 = command, 1 = data)  |
+| RW      | Read/Write (0 = write, 1 = read)         |
+| EN      | Enable (latch signal)                    |
+| D0-D7   | Data pins (8-bit mode)                    |
+
+- When **RS = 0**, data sent is stored in the instruction register (commands).  
+- When **RS = 1**, data sent is stored in the data register (characters).  
+
+---
+
+### 8-bit vs 4-bit Mode
+
+- **8-bit mode:** Connect a full 8-bit port (e.g., PORTC) for data pins D0-D7 to LCD. Faster but uses more I/O pins.
+- **4-bit mode:** Use only 4 data lines, sending commands in two nibbles, saving pin count at the cost of complexity.
+
+---
+
+### Key LCD Commands Used
+
+| Command       | Function                             |
+|---------------|------------------------------------|
+| `0x38`        | Function set: 8-bit, 2 lines, 5x8 font |
+| `0x06`        | Entry mode set: cursor auto-increment |
+| `0x0C`        | Display on, cursor off              |
+| `0x01`        | Clear display                      |
+
+---
+
+### Working Flow
+
+- Configure ports connected to LCD data and control lines as outputs.
+- Send the above commands in sequence to initialize the LCD.
+- Display characters by writing data to the LCD’s data register.
+- Use delays to allow the LCD time to process commands.
+
+---
 ### Source code snpiiet
 ```
 #include <xc.h>
